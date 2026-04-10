@@ -1,4 +1,7 @@
 import * as THREE from 'three'
+import { CUBIE_SIZE, CUBIE_GAP } from '../utils/constants.js'
+
+const STEP = CUBIE_SIZE + CUBIE_GAP // 1.04
 
 /**
  * Map a face letter to its rotation axis vector and the axis index.
@@ -28,13 +31,14 @@ export function getRotationTarget(face, modifier) {
 }
 
 /**
- * Round a cubie's position components to the nearest integer
- * to eliminate floating-point drift after repeated rotations.
+ * Round a cubie's position to the nearest STEP-multiple.
+ * Uses STEP (1.04) instead of integers to eliminate the
+ * small 0.04-unit visual gap that plain Math.round() produces.
  */
 export function snapPosition(vec3) {
-  vec3.x = Math.round(vec3.x)
-  vec3.y = Math.round(vec3.y)
-  vec3.z = Math.round(vec3.z)
+  vec3.x = Math.round(vec3.x / STEP) * STEP
+  vec3.y = Math.round(vec3.y / STEP) * STEP
+  vec3.z = Math.round(vec3.z / STEP) * STEP
   return vec3
 }
 

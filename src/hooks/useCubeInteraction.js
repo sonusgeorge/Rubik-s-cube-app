@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, useEffect } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useDragDetection } from './useDragDetection.js'
@@ -10,78 +10,99 @@ import { useTutorialStore } from '../store/tutorialStore.js'
 /**
  * Orchestrates drag detection → rotation animation → state update.
  *
- * `cubeGroupRef` — ref to the parent THREE.Group holding all cubies
- * `cubieRefs`    — ref to array of cubie mesh objects
+ * `cubeGroupRef` — ref to the <group> wrapping all 27 cubies (from RubiksCube)
+ * `cubieRefs`    — ref to array of cubie RoundedBox mesh objects (for raycasting)
  * `orbitRef`     — ref to OrbitControls (disabled during drag)
+ * `domElement`   — the canvas DOM element (for pointer event attachment)
  */
-export function useCubeInteraction({ cubeGroupRef, cubieRefs, orbitRef }) {
+export function useCubeInteraction({ cubeGroupRef, cubieRefs, orbitRef, domElement }) {
   const { camera } = useThree()
   const cameraRef = useRef()
   cameraRef.current = camera
 
-  const isAnimating = useCubeStore((s) => s.isAnimating)
-  const applyMoveFn = useCubeStore((s) => s.applyMove)
-  const setAnimating = useCubeStore((s) => s.setAnimating)
   const validateMove = useTutorialStore((s) => s.validateMove)
   const isTutorialActive = useTutorialStore((s) => s.isActive)
 
   const animateRotation = useRotation()
 
+  /**
+   * Execute a single move with full animation + state update.
+   * Reads isAnimating fresh from store to avoid stale-closure bugs.
+   * speedOverride: 'fast' | 'slow' | 'instant' | undefined (uses user setting)
+   */
   const executeMove = useCallback(
-    async (moveName) => {
-      if (isAnimating) return
-      setAnimating(true)
+    async (moveName, speedOverride) => {
+      // Always read fresh from store — avoids stale closure on isAnimating
+      if (useCubeStore.getState().isAnimating) return
+      useCubeStore.getState().setAnimating(true)
+
       if (orbitRef?.current) orbitRef.current.enabled = false
 
       // Tutorial validation
       if (isTutorialActive) {
-        const result = validateMove(moveName)
-        if (result === 'wrong') {
-          // Still animate but signal wrong
-        }
+        validateMove(moveName)
       }
 
-      // Determine rotation target
-      const [face] = [moveName.replace("'", '').replace('2', '')]
+      // Parse move
+      const face = moveName.replace("'", '').replace('2', '')
       const modifier = moveName.includes("'") ? -1 : moveName.includes('2') ? 2 : 1
       const { axisName, angle } = getRotationTarget(face, modifier)
 
-      // Find the 9 cubies in this layer
-      const allCubies = cubeGroupRef.current?.children ?? []
-      const layerCubies = getCubiesInLayer(allCubies, face)
+      // Find the 9 cubies in this face layer
+      // cubeGroupRef.current.children = the 27 Cubie <group> wrappers
+      const cubeChildren = Array.from(cubeGroupRef.current?.children ?? [])
+      const layerCubies = getCubiesInLayer(cubeChildren, face)
 
-      // Create a temporary rotation group
-      const rotGroup = new THREE.Group()
-      cubeGroupRef.current.add(rotGroup)
-      for (const c of layerCubies) {
-        rotGroup.attach(c)
+      if (layerCubies.length > 0) {
+        // Temporarily re-parent layer cubies into a rotation group
+        const rotGroup = new THREE.Group()
+        cubeGroupRef.current.add(rotGroup)
+        for (const c of layerCubies) {
+          rotGroup.attach(c) // preserves world transform
+        }
+
+        // GSAP-animate the rotation group
+        await animateRotation(rotGroup, axisName, angle, speedOverride)
+
+        // Re-parent back to main cube group + snap to grid
+        for (const c of [...rotGroup.children]) {
+          cubeGroupRef.current.attach(c)
+          snapPosition(c.position)
+          c.rotation.set(0, 0, 0)
+        }
+        cubeGroupRef.current.remove(rotGroup)
       }
 
-      // Animate
-      await animateRotation(rotGroup, axisName, angle)
+      // Update logical facelet state (triggers React re-render for colors)
+      useCubeStore.getState().applyMove(moveName)
+      useCubeStore.getState().setAnimating(false)
 
-      // Re-parent cubies back and snap positions
-      for (const c of [...rotGroup.children]) {
-        cubeGroupRef.current.attach(c)
-        snapPosition(c.position)
-        c.rotation.set(0, 0, 0)
-      }
-      cubeGroupRef.current.remove(rotGroup)
-
-      // Update logical state
-      applyMoveFn(moveName)
-      setAnimating(false)
       if (orbitRef?.current) orbitRef.current.enabled = true
     },
-    [isAnimating, animateRotation, applyMoveFn, setAnimating, cubeGroupRef, orbitRef, isTutorialActive, validateMove]
+    // NOTE: we intentionally exclude isAnimating from deps — we read it from store
+    [animateRotation, cubeGroupRef, orbitRef, isTutorialActive, validateMove]
   )
 
   const { onPointerDown, onPointerUp } = useDragDetection({
     cubieRefs,
     camera: cameraRef,
+    domElement,
+    orbitRef,
     onRotate: executeMove,
-    disabled: isAnimating,
   })
 
-  return { onPointerDown, onPointerUp, executeMove }
+  // Attach native DOM pointer events to the canvas element.
+  // Using DOM events (not R3F synthetic events) avoids the invisible-box problem.
+  useEffect(() => {
+    if (!domElement) return
+    // Use 'capture: true' so our handler fires before OrbitControls sees the event
+    domElement.addEventListener('pointerdown', onPointerDown, { capture: true })
+    domElement.addEventListener('pointerup', onPointerUp, { capture: true })
+    return () => {
+      domElement.removeEventListener('pointerdown', onPointerDown, { capture: true })
+      domElement.removeEventListener('pointerup', onPointerUp, { capture: true })
+    }
+  }, [domElement, onPointerDown, onPointerUp])
+
+  return { executeMove }
 }

@@ -8,9 +8,13 @@ const STEP = CUBIE_SIZE + CUBIE_GAP  // 1.04
 
 /**
  * Assembles all 27 cubies at the correct world positions.
- * `cubieRefs` is populated with the Three.js mesh objects for drag detection.
+ *
+ * Props:
+ *   cubieRefs   — ref to array; cubie RoundedBox meshes are pushed here for raycasting
+ *   cubeGroupRef — ref attached to the root <group>; used by useCubeInteraction
+ *                  for re-parenting during rotation animation
  */
-export default function RubiksCube({ cubieRefs }) {
+export default function RubiksCube({ cubieRefs, cubeGroupRef }) {
   const facelets = useCubeStore((s) => s.facelets)
   const cubieFaceColors = buildCubieFaceColors(facelets)
 
@@ -34,5 +38,7 @@ export default function RubiksCube({ cubieRefs }) {
     }
   }
 
-  return <group>{cubies}</group>
+  // cubeGroupRef is the rotation anchor — useCubeInteraction re-parents
+  // individual Cubie groups in/out of a temporary rotation group here.
+  return <group ref={cubeGroupRef}>{cubies}</group>
 }

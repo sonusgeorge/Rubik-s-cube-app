@@ -3,6 +3,7 @@ import CubeScene from './components/canvas/CubeScene.jsx'
 import Toolbar from './components/ui/Toolbar.jsx'
 import MoveHistory from './components/ui/MoveHistory.jsx'
 import SettingsPanel from './components/ui/SettingsPanel.jsx'
+import SolvedOverlay from './components/ui/SolvedOverlay.jsx'
 import TutorialOverlay from './components/tutorial/TutorialOverlay.jsx'
 import { useTutorialStore } from './store/tutorialStore.js'
 
@@ -23,6 +24,9 @@ export default function App() {
           <MoveHistory />
         </div>
       </div>
+
+      {/* Win celebration */}
+      <SolvedOverlay />
 
       {/* Tutorial overlay */}
       {isTutorialActive && <TutorialOverlay />}

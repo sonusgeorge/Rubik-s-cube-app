@@ -1,19 +1,18 @@
-import { useRef, useCallback } from 'react'
+import { useRef, useCallback, useEffect } from 'react'
 import * as THREE from 'three'
+import useCubeStore from '../store/cubeStore.js'
 
-const DRAG_THRESHOLD = 5 // px before we commit to a rotation
+const DRAG_THRESHOLD = 8 // px before we commit to a rotation
 
 /**
- * Returns pointer event handlers that detect which face was tapped and
- * the swipe direction, then call `onRotate(moveName)`.
+ * Attaches native DOM pointer listeners to `domElement` (the canvas).
+ * On pointer-down: raycasts against cubieRefs to find hit cubie + face normal.
+ * On pointer-up: computes drag direction → move name → calls onRotate.
  *
- * `cubieRefs` — array of Three.js mesh objects to raycast against.
- * `camera`    — Three.js camera.
- * `onRotate`  — callback(moveName: string)
- * `disabled`  — boolean: block new drags while animating
+ * Uses the real canvas DOM element for accurate NDC calculation.
  */
-export function useDragDetection({ cubieRefs, camera, onRotate, disabled }) {
-  const state = useRef({
+export function useDragDetection({ cubieRefs, camera, domElement, orbitRef, onRotate }) {
+  const dragState = useRef({
     down: false,
     startX: 0,
     startY: 0,
@@ -23,52 +22,76 @@ export function useDragDetection({ cubieRefs, camera, onRotate, disabled }) {
 
   const raycaster = useRef(new THREE.Raycaster())
 
-  const getPointerNDC = useCallback((event, domElement) => {
-    const rect = domElement.getBoundingClientRect()
-    const clientX = event.touches ? event.touches[0].clientX : event.clientX
-    const clientY = event.touches ? event.touches[0].clientY : event.clientY
-    return new THREE.Vector2(
-      ((clientX - rect.left) / rect.width) * 2 - 1,
-      -((clientY - rect.top) / rect.height) * 2 + 1
-    )
-  }, [])
+  const getPointerNDC = useCallback(
+    (event) => {
+      if (!domElement) return new THREE.Vector2()
+      const rect = domElement.getBoundingClientRect()
+      const clientX = event.touches ? event.touches[0].clientX : event.clientX
+      const clientY = event.touches ? event.touches[0].clientY : event.clientY
+      return new THREE.Vector2(
+        ((clientX - rect.left) / rect.width) * 2 - 1,
+        -((clientY - rect.top) / rect.height) * 2 + 1
+      )
+    },
+    [domElement]
+  )
 
   const onPointerDown = useCallback(
     (event) => {
-      if (disabled) return
-      const ndc = getPointerNDC(event, event.target)
-      raycaster.current.setFromCamera(ndc, camera.current)
-      const hits = raycaster.current.intersectObjects(cubieRefs.current ?? [], false)
+      // Block new drags while animating
+      if (useCubeStore.getState().isAnimating) return
+      if (!domElement || !camera.current) return
 
+      const ndc = getPointerNDC(event)
+      raycaster.current.setFromCamera(ndc, camera.current)
+
+      const meshes = cubieRefs.current ?? []
+      const hits = raycaster.current.intersectObjects(meshes, false)
       if (hits.length === 0) return
 
       const hit = hits[0]
-      state.current = {
+      // Transform face normal from local space to world space
+      const worldNormal = hit.face.normal
+        .clone()
+        .transformDirection(hit.object.matrixWorld)
+
+      dragState.current = {
         down: true,
         startX: event.touches ? event.touches[0].clientX : event.clientX,
         startY: event.touches ? event.touches[0].clientY : event.clientY,
         hitCubie: hit.object,
-        hitNormal: hit.face.normal.clone().transformDirection(hit.object.matrixWorld),
+        hitNormal: worldNormal,
       }
+      // Disable OrbitControls immediately so it doesn't steal the drag
+      if (orbitRef?.current) orbitRef.current.enabled = false
+      // Stop event propagation so OrbitControls never sees this pointerdown
       event.stopPropagation()
     },
-    [disabled, camera, cubieRefs, getPointerNDC]
+    [camera, cubieRefs, getPointerNDC, domElement]
   )
 
   const onPointerUp = useCallback(
     (event) => {
-      if (!state.current.down) return
-      state.current.down = false
+      if (!dragState.current.down) return
+      dragState.current.down = false
 
-      const clientX = event.changedTouches ? event.changedTouches[0].clientX : event.clientX
-      const clientY = event.changedTouches ? event.changedTouches[0].clientY : event.clientY
-      const dx = clientX - state.current.startX
-      const dy = clientY - state.current.startY
+      if (useCubeStore.getState().isAnimating) return
+
+      const clientX = event.changedTouches
+        ? event.changedTouches[0].clientX
+        : event.clientX
+      const clientY = event.changedTouches
+        ? event.changedTouches[0].clientY
+        : event.clientY
+
+      const dx = clientX - dragState.current.startX
+      const dy = clientY - dragState.current.startY
       const dist = Math.sqrt(dx * dx + dy * dy)
-
       if (dist < DRAG_THRESHOLD) return // tap, not swipe
 
-      const { hitCubie, hitNormal } = state.current
+      const { hitCubie, hitNormal } = dragState.current
+      // Re-enable OrbitControls regardless of whether a move fired
+      if (orbitRef?.current) orbitRef.current.enabled = true
       if (!hitCubie || !hitNormal) return
 
       const move = determineMoveFromDrag(hitNormal, dx, dy, hitCubie)
@@ -82,18 +105,18 @@ export function useDragDetection({ cubieRefs, camera, onRotate, disabled }) {
 
 /**
  * Given the face normal and drag delta, determine the move notation string.
- *
  * Strategy: cross(faceNormal, dragDirection) → rotation axis
- * Then map axis + cubie position to face name + direction.
+ * Then map axis + cubie position → face name + direction.
  */
 function determineMoveFromDrag(faceNormal, dx, dy, cubie) {
-  // Build a screen-space drag vector (in world space we use x/y screen axes)
+  // Build a screen-space drag vector projected into world space
   const drag = new THREE.Vector3(dx, -dy, 0).normalize()
 
-  // The rotation axis is perpendicular to both the face normal and the drag direction
-  const rotAxis = new THREE.Vector3().crossVectors(faceNormal, drag).normalize()
+  // Rotation axis = perpendicular to both face normal and drag
+  const rotAxis = new THREE.Vector3()
+    .crossVectors(faceNormal, drag)
+    .normalize()
 
-  // Dominant component tells us which world axis we're rotating around
   const absX = Math.abs(rotAxis.x)
   const absY = Math.abs(rotAxis.y)
   const absZ = Math.abs(rotAxis.z)
@@ -107,7 +130,7 @@ function determineMoveFromDrag(faceNormal, dx, dy, cubie) {
     axisIndex = 2; axisSign = rotAxis.z > 0 ? 1 : -1
   }
 
-  // Which layer along that axis?
+  // Which grid layer along this axis?
   const worldPos = new THREE.Vector3()
   cubie.getWorldPosition(worldPos)
   const layer = Math.round([worldPos.x, worldPos.y, worldPos.z][axisIndex])
@@ -115,13 +138,11 @@ function determineMoveFromDrag(faceNormal, dx, dy, cubie) {
   return layerToMove(axisIndex, layer, axisSign)
 }
 
+// axis index → { layer → face letter }
 const AXIS_FACE_MAP = [
-  // axis 0 (X): layer +1 → R, layer -1 → L
-  { 1: 'R', '-1': 'L' },
-  // axis 1 (Y): layer +1 → U, layer -1 → D
-  { 1: 'U', '-1': 'D' },
-  // axis 2 (Z): layer +1 → F, layer -1 → B
-  { 1: 'F', '-1': 'B' },
+  { 1: 'R', '-1': 'L' },  // X axis
+  { 1: 'U', '-1': 'D' },  // Y axis
+  { 1: 'F', '-1': 'B' },  // Z axis
 ]
 
 function layerToMove(axisIndex, layer, sign) {
@@ -129,6 +150,5 @@ function layerToMove(axisIndex, layer, sign) {
   const faceMap = AXIS_FACE_MAP[axisIndex]
   const face = faceMap[layer]
   if (!face) return null
-  // sign > 0 means CW when looking from positive axis direction
   return sign > 0 ? face : `${face}'`
 }

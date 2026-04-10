@@ -1,8 +1,19 @@
 import { create } from 'zustand'
-import { solvedState, applyMove, isSolved } from '../core/CubeState.js'
+import { solvedState, applyMove, isSolved, parseMoveStr } from '../core/CubeState.js'
 import { generateScramble } from '../core/scrambler.js'
-import { parseNotation } from '../core/notation.js'
-import { solve } from '../core/solver/index.js'
+
+/**
+ * Invert a single move string.
+ *   R  → R'
+ *   R' → R
+ *   R2 → R2  (180° is its own inverse)
+ */
+function invertMove(moveName) {
+  const [face, modifier] = parseMoveStr(moveName)
+  if (modifier === 2) return `${face}2`
+  if (modifier === -1) return face
+  return `${face}'`
+}
 
 const useCubeStore = create((set, get) => ({
   facelets: solvedState(),
@@ -62,30 +73,33 @@ const useCubeStore = create((set, get) => ({
   },
 
   /**
-   * Generate a scramble and queue it for animated playback.
-   * Returns the move string so the animation layer can consume it.
+   * Generate a scramble and reset to solved state.
+   * Returns the move array so the animation layer can play them one by one.
+   * Does NOT pre-apply moves to state — each executeMove call does that.
    */
   scramble() {
     const scrambleStr = generateScramble(20)
-    const moves = parseNotation(scrambleStr).map((m) => m.raw)
-    // Apply all moves to state immediately; animation drives the 3D visuals
-    let state = solvedState()
-    for (const move of moves) state = applyMove(state, move)
+    const moves = scrambleStr.trim().split(/\s+/).filter(Boolean)
+    // Reset to solved so the animation starts from a clean visual state
     set({
-      facelets: state,
-      moveHistory: moves.map((move) => ({ move, timestamp: Date.now() })),
+      facelets: solvedState(),
+      moveHistory: [],
       redoStack: [],
-      isSolved: false,
+      isAnimating: false,
+      isSolved: true,
     })
     return moves
   },
 
   /**
-   * Compute the solution for the current state.
-   * Returns a move array; animation layer plays it back.
+   * Compute the solution by inverting the current move history.
+   * This always produces a valid (if not minimal) solution.
+   * Returns a move string array for animated playback.
    */
   getSolution() {
-    return solve(get().facelets)
+    const { moveHistory } = get()
+    if (moveHistory.length === 0) return []
+    return [...moveHistory].reverse().map(({ move }) => invertMove(move))
   },
 
   reset() {

@@ -7,7 +7,8 @@ import CubeControls from './CubeControls.jsx'
 
 export default function CubeScene() {
   const orbitRef = useRef()
-  const cubieRefs = useRef([])
+  const cubieRefs = useRef([])   // array of RoundedBox meshes — for raycasting
+  const cubeGroupRef = useRef()  // the <group> root of all 27 cubies — for re-parenting
 
   return (
     <Canvas
@@ -42,11 +43,11 @@ export default function CubeScene() {
       {/* Environment map for reflections */}
       <Environment preset="studio" />
 
-      {/* The cube */}
-      <RubiksCube cubieRefs={cubieRefs} />
+      {/* The cube — cubeGroupRef is the rotation anchor */}
+      <RubiksCube cubieRefs={cubieRefs} cubeGroupRef={cubeGroupRef} />
 
-      {/* Interaction handler */}
-      <CubeControls orbitRef={orbitRef} cubieRefs={cubieRefs} />
+      {/* Interaction handler — attaches events to canvas, no visible geometry */}
+      <CubeControls orbitRef={orbitRef} cubieRefs={cubieRefs} cubeGroupRef={cubeGroupRef} />
 
       {/* Ground */}
       <GroundPlane />

@@ -5,7 +5,7 @@ const useUIStore = create((set) => ({
   soundEnabled: true,
   showSettings: false,
   showNotationGuide: false,
-  celebratingsolve: false,
+  celebratingSolve: false,
 
   setAnimationSpeed(speed) {
     set({ animationSpeed: speed })

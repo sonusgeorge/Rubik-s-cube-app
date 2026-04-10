@@ -3,60 +3,118 @@ import { RotateCcw, RotateCw, Shuffle, Sparkles, RefreshCw, Settings, BookOpen }
 import useCubeStore from '../../store/cubeStore.js'
 import useUIStore from '../../store/uiStore.js'
 import { useTutorialStore } from '../../store/tutorialStore.js'
-import { parseNotation } from '../../core/notation.js'
 
 export default function Toolbar() {
-  const { undo, redo, scramble, getSolution, reset, moveHistory, redoStack, isAnimating, isSolved } = useCubeStore()
-  const { toggleSettings, toggleNotationGuide } = useUIStore()
+  const {
+    undo, redo, scramble, getSolution, reset,
+    moveHistory, redoStack, isAnimating, isSolved,
+  } = useCubeStore()
+  const { toggleSettings, toggleNotationGuide, triggerCelebration } = useUIStore()
   const startTutorial = useTutorialStore((s) => s.startTutorial)
-  const executeMove = useCubeStore((s) => s.executeMove)
 
-  const handleScramble = useCallback(() => {
-    if (isAnimating) return
-    const moves = scramble()
-    // Queue animated playback
-    if (executeMove) {
-      let delay = 0
-      for (const move of moves) {
-        setTimeout(() => executeMove(move), delay)
-        delay += 140 // fast pace
-      }
+  /**
+   * Scramble: reset to solved then animate each move sequentially at fast speed.
+   * Reads executeMove fresh from store on each iteration to avoid stale closure.
+   */
+  const handleScramble = useCallback(async () => {
+    if (useCubeStore.getState().isAnimating) return
+    const moves = scramble() // resets state to solved, returns move list
+    // Give React one tick to re-render the solved visual state
+    await new Promise((r) => setTimeout(r, 50))
+    for (const move of moves) {
+      const execFn = useCubeStore.getState().executeMove
+      if (execFn) await execFn(move, 'fast')
     }
-  }, [isAnimating, scramble, executeMove])
+  }, [scramble])
 
+  /**
+   * Solve: play back the inverse of move history sequentially.
+   */
   const handleSolve = useCallback(async () => {
-    if (isAnimating || isSolved) return
+    if (useCubeStore.getState().isAnimating) return
+    if (useCubeStore.getState().isSolved) return
     const solution = getSolution()
     if (!solution || solution.length === 0) return
-    if (executeMove) {
-      for (const move of solution) {
-        await new Promise((res) => setTimeout(res, 50))
-        await executeMove(move)
-      }
+    for (const move of solution) {
+      const execFn = useCubeStore.getState().executeMove
+      if (execFn) await execFn(move)
     }
-  }, [isAnimating, isSolved, getSolution, executeMove])
+    // Trigger win celebration after solve completes
+    if (useCubeStore.getState().isSolved) {
+      triggerCelebration()
+    }
+  }, [getSolution, triggerCelebration])
+
+  /**
+   * Undo / Redo — instant state change (no animation).
+   */
+  const handleUndo = useCallback(() => {
+    if (useCubeStore.getState().isAnimating) return
+    undo()
+  }, [undo])
+
+  const handleRedo = useCallback(() => {
+    if (useCubeStore.getState().isAnimating) return
+    redo()
+  }, [redo])
 
   const btnClass =
-    'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ' +
-    'bg-white/10 hover:bg-white/20 text-white disabled:opacity-40 disabled:cursor-not-allowed'
+    'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 ' +
+    'bg-white/10 hover:bg-white/20 active:scale-95 text-white disabled:opacity-40 disabled:cursor-not-allowed'
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <button className={btnClass} onClick={undo} disabled={moveHistory.length === 0 || isAnimating} title="Undo">
+      <button
+        className={btnClass}
+        onClick={handleUndo}
+        disabled={moveHistory.length === 0 || isAnimating}
+        title="Undo last move"
+      >
         <RotateCcw size={16} /> Undo
       </button>
-      <button className={btnClass} onClick={redo} disabled={redoStack.length === 0 || isAnimating} title="Redo">
+
+      <button
+        className={btnClass}
+        onClick={handleRedo}
+        disabled={redoStack.length === 0 || isAnimating}
+        title="Redo move"
+      >
         <RotateCw size={16} /> Redo
       </button>
-      <button className={btnClass} onClick={handleScramble} disabled={isAnimating} title="Scramble">
+
+      <button
+        className={btnClass}
+        onClick={handleScramble}
+        disabled={isAnimating}
+        title="Scramble the cube"
+      >
         <Shuffle size={16} /> Scramble
       </button>
-      <button className={btnClass} onClick={handleSolve} disabled={isAnimating || isSolved} title="Solve">
+
+      <button
+        className={btnClass}
+        onClick={handleSolve}
+        disabled={isAnimating || isSolved}
+        title="Auto-solve"
+      >
         <Sparkles size={16} /> Solve
       </button>
-      <button className={btnClass} onClick={reset} disabled={isAnimating} title="Reset">
+
+      <button
+        className={btnClass}
+        onClick={reset}
+        disabled={isAnimating}
+        title="Reset to solved"
+      >
         <RefreshCw size={16} /> Reset
       </button>
+
+      {/* Move counter */}
+      {moveHistory.length > 0 && (
+        <span className="text-white/50 text-xs font-mono px-2">
+          {moveHistory.length} moves
+        </span>
+      )}
 
       <div className="flex-1" />
 

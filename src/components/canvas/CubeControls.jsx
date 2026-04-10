@@ -1,42 +1,34 @@
-import React, { useRef, useEffect } from 'react'
+import { useEffect } from 'react'
 import { useThree } from '@react-three/fiber'
 import { useCubeInteraction } from '../../hooks/useCubeInteraction.js'
 import useCubeStore from '../../store/cubeStore.js'
 
 /**
- * Invisible plane that captures pointer events for drag-to-rotate.
- * Also handles programmatic moves queued from the toolbar (scramble/solve).
+ * R3F component that wires up pointer-based cube rotation.
+ * No longer renders any visible or invisible geometry —
+ * events are attached directly to gl.domElement (the canvas).
+ *
+ * Props:
+ *   cubieRefs   — ref to array of cubie RoundedBox meshes (for raycasting)
+ *   cubeGroupRef — ref to the <group> containing all 27 cubies (for re-parenting)
+ *   orbitRef    — ref to OrbitControls (disabled while rotating)
  */
-export default function CubeControls({ cubieRefs, orbitRef }) {
-  const cubeGroupRef = useRef()
-  const { scene } = useThree()
+export default function CubeControls({ cubieRefs, cubeGroupRef, orbitRef }) {
+  const { gl } = useThree()
 
-  // Attach to scene so getCubiesInLayer can find them
-  useEffect(() => {
-    cubeGroupRef.current = scene
-  }, [scene])
-
-  const { onPointerDown, onPointerUp, executeMove } = useCubeInteraction({
+  const { executeMove } = useCubeInteraction({
     cubeGroupRef,
     cubieRefs,
     orbitRef,
+    domElement: gl.domElement,
   })
 
-  // Expose executeMove so toolbar can trigger moves
-  // Store it on the cubeStore for external use
+  // Register executeMove on the store so Toolbar can call it
   const setExecuteMove = useCubeStore((s) => s.setExecuteMove)
   useEffect(() => {
     if (setExecuteMove) setExecuteMove(executeMove)
   }, [executeMove, setExecuteMove])
 
-  return (
-    <mesh
-      visible={false}
-      onPointerDown={onPointerDown}
-      onPointerUp={onPointerUp}
-    >
-      <boxGeometry args={[3.5, 3.5, 3.5]} />
-      <meshBasicMaterial transparent opacity={0} />
-    </mesh>
-  )
+  // No rendered output — events live on the canvas DOM element
+  return null
 }
