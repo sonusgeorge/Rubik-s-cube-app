@@ -23,7 +23,8 @@ export default function CubeScene() {
       <OrbitControls
         ref={orbitRef}
         enableDamping
-        dampingFactor={0.08}
+        dampingFactor={0.12}
+        rotateSpeed={0.8}
         minDistance={4}
         maxDistance={12}
         enablePan={false}

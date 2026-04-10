@@ -12,7 +12,7 @@ const DRAG_THRESHOLD = 8 // px before we commit to a rotation
  *
  * Uses the real canvas DOM element for accurate NDC calculation.
  */
-export function useDragDetection({ cubieRefs, camera, domElement, orbitRef, onRotate }) {
+export function useDragDetection({ cubieRefs, camera, domElement, orbitRef, onRotate, scene }) {
   const dragState = useRef({
     down: false,
     startX: 0,
@@ -90,14 +90,15 @@ export function useDragDetection({ cubieRefs, camera, domElement, orbitRef, onRo
       const dx = clientX - dragState.current.startX
       const dy = clientY - dragState.current.startY
       const dist = Math.sqrt(dx * dx + dy * dy)
-      if (dist < DRAG_THRESHOLD) return // tap, not swipe
 
       const { hitCubie, hitNormal } = dragState.current
       // Re-enable OrbitControls regardless of whether a move fired
       if (orbitRef?.current) orbitRef.current.enabled = true
+
+      if (dist < DRAG_THRESHOLD) return // tap, not swipe
       if (!hitCubie || !hitNormal) return
 
-      const move = determineMoveFromDrag(hitNormal, dx, dy, hitCubie)
+      const move = determineMoveFromDrag(hitNormal, dx, dy, hitCubie, camera.current)
       if (move) onRotate(move)
     },
     [onRotate]
@@ -108,12 +109,23 @@ export function useDragDetection({ cubieRefs, camera, domElement, orbitRef, onRo
 
 /**
  * Given the face normal and drag delta, determine the move notation string.
- * Strategy: cross(faceNormal, dragDirection) → rotation axis
+ * Strategy: project screen-space drag into world space using camera orientation,
+ * then cross(faceNormal, worldDrag) → rotation axis.
  * Then map axis + cubie position → face name + direction.
  */
-function determineMoveFromDrag(faceNormal, dx, dy, cubie) {
-  // Build a screen-space drag vector projected into world space
-  const drag = new THREE.Vector3(dx, -dy, 0).normalize()
+function determineMoveFromDrag(faceNormal, dx, dy, cubie, cam) {
+  // Project the screen-space drag vector into world space using the camera's
+  // right and up axes. This ensures the drag direction is correct regardless
+  // of the camera's current viewing angle.
+  const camRight = new THREE.Vector3()
+  const camUp = new THREE.Vector3()
+  camRight.setFromMatrixColumn(cam.matrixWorld, 0) // camera X axis (right)
+  camUp.setFromMatrixColumn(cam.matrixWorld, 1)    // camera Y axis (up)
+
+  const drag = new THREE.Vector3()
+    .addScaledVector(camRight, dx)
+    .addScaledVector(camUp, -dy)
+    .normalize()
 
   // Rotation axis = perpendicular to both face normal and drag
   const rotAxis = new THREE.Vector3()
