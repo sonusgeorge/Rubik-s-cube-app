@@ -6,6 +6,7 @@ import { useRotation } from './useRotation.js'
 import { getRotationTarget, getCubiesInLayer, snapPosition } from '../core/rotationMath.js'
 import useCubeStore from '../store/cubeStore.js'
 import { useTutorialStore } from '../store/tutorialStore.js'
+import useUIStore from '../store/uiStore.js'
 
 /**
  * Orchestrates drag detection → rotation animation → state update.
@@ -103,6 +104,16 @@ export function useCubeInteraction({ cubeGroupRef, cubieRefs, orbitRef, domEleme
       domElement.removeEventListener('pointerup', onPointerUp, { capture: true })
     }
   }, [domElement, onPointerDown, onPointerUp])
+
+  // Keep OrbitControls in sync with the interaction mode.
+  // In 'look' mode, ensure orbit is always enabled.
+  const interactionMode = useUIStore((s) => s.interactionMode)
+  useEffect(() => {
+    if (!orbitRef?.current) return
+    if (interactionMode === 'look') {
+      orbitRef.current.enabled = true
+    }
+  }, [interactionMode, orbitRef])
 
   return { executeMove }
 }

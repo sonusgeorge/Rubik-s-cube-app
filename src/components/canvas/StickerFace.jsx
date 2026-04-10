@@ -13,9 +13,13 @@ const DIR_CONFIG = {
   'z-': { pos: [0, 0, -STICKER_OFFSET],  rot: [0, Math.PI, 0] },
 }
 
+const STICKER_DEPTH = 0.04  // Thin box depth — visible from all angles during rotation
+
 /**
- * A single coloured sticker rendered as a slightly raised plane
- * on the surface of a cubie.
+ * A single coloured sticker rendered as a thin box (not a plane).
+ * Using a box instead of a plane avoids backface-culling artifacts
+ * when the cube layer rotates and stickers temporarily face away
+ * from the camera (which caused the "black sticker" bug during animation).
  *
  * Props:
  *   direction — one of 'y+', 'y-', 'x+', 'x-', 'z+', 'z-'
@@ -36,7 +40,8 @@ export default function StickerFace({
 
   const hexColor = FACE_COLORS[color] ?? color
 
-  const material = useMemo(
+  // Front face (visible colored sticker)
+  const frontMaterial = useMemo(
     () =>
       new THREE.MeshPhysicalMaterial({
         color: hexColor,
@@ -52,10 +57,37 @@ export default function StickerFace({
     [hexColor, emissive, emissiveIntensity, opacity]
   )
 
+  // Side and back faces of the thin box — match cubie body color
+  const sideMaterial = useMemo(
+    () =>
+      new THREE.MeshPhysicalMaterial({
+        color: '#1a1a1a',
+        roughness: 0.35,
+        metalness: 0,
+        transparent: opacity < 1,
+        opacity,
+      }),
+    [opacity]
+  )
+
+  // BoxGeometry face order: +X, -X, +Y, -Y, +Z, -Z
+  // The sticker plane is along Z (local), so +Z face = front of sticker = colored
+  // All other faces = dark body color
+  const materials = [
+    sideMaterial,  // +X
+    sideMaterial,  // -X
+    sideMaterial,  // +Y
+    sideMaterial,  // -Y
+    frontMaterial, // +Z  ← the visible colored face
+    sideMaterial,  // -Z
+  ]
+
   return (
     <mesh position={cfg.pos} rotation={cfg.rot}>
-      <planeGeometry args={[STICKER_SIZE, STICKER_SIZE]} />
-      <primitive object={material} attach="material" />
+      <boxGeometry args={[STICKER_SIZE, STICKER_SIZE, STICKER_DEPTH]} />
+      {materials.map((mat, i) => (
+        <primitive key={i} object={mat} attach={`material-${i}`} />
+      ))}
     </mesh>
   )
 }

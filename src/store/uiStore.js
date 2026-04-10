@@ -6,6 +6,7 @@ const useUIStore = create((set) => ({
   showSettings: false,
   showNotationGuide: false,
   celebratingSolve: false,
+  interactionMode: 'turn',  // 'turn' | 'look'
 
   setAnimationSpeed(speed) {
     set({ animationSpeed: speed })
@@ -23,6 +24,10 @@ const useUIStore = create((set) => ({
     set({ celebratingSolve: true })
     setTimeout(() => set({ celebratingSolve: false }), 4000)
   },
+  toggleInteractionMode() {
+    set((s) => ({ interactionMode: s.interactionMode === 'turn' ? 'look' : 'turn' }))
+  },
 }))
 
 export default useUIStore
+

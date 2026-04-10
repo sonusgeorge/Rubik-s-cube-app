@@ -1,6 +1,7 @@
-import { useRef, useCallback, useEffect } from 'react'
+import { useRef, useCallback } from 'react'
 import * as THREE from 'three'
 import useCubeStore from '../store/cubeStore.js'
+import useUIStore from '../store/uiStore.js'
 
 const DRAG_THRESHOLD = 8 // px before we commit to a rotation
 
@@ -38,6 +39,8 @@ export function useDragDetection({ cubieRefs, camera, domElement, orbitRef, onRo
 
   const onPointerDown = useCallback(
     (event) => {
+      // In 'look' mode, skip entirely — OrbitControls owns all drags
+      if (useUIStore.getState().interactionMode === 'look') return
       // Block new drags while animating
       if (useCubeStore.getState().isAnimating) return
       if (!domElement || !camera.current) return

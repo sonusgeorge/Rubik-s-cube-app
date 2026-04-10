@@ -1,5 +1,8 @@
 import React, { useCallback } from 'react'
-import { RotateCcw, RotateCw, Shuffle, Sparkles, RefreshCw, Settings, BookOpen } from 'lucide-react'
+import {
+  RotateCcw, RotateCw, Shuffle, Sparkles, RefreshCw,
+  Settings, BookOpen, Hand, Eye,
+} from 'lucide-react'
 import useCubeStore from '../../store/cubeStore.js'
 import useUIStore from '../../store/uiStore.js'
 import { useTutorialStore } from '../../store/tutorialStore.js'
@@ -9,17 +12,20 @@ export default function Toolbar() {
     undo, redo, scramble, getSolution, reset,
     moveHistory, redoStack, isAnimating, isSolved,
   } = useCubeStore()
-  const { toggleSettings, toggleNotationGuide, triggerCelebration } = useUIStore()
+  const {
+    toggleSettings, toggleNotationGuide, triggerCelebration,
+    interactionMode, toggleInteractionMode,
+  } = useUIStore()
   const startTutorial = useTutorialStore((s) => s.startTutorial)
+
+  const isLookMode = interactionMode === 'look'
 
   /**
    * Scramble: reset to solved then animate each move sequentially at fast speed.
-   * Reads executeMove fresh from store on each iteration to avoid stale closure.
    */
   const handleScramble = useCallback(async () => {
     if (useCubeStore.getState().isAnimating) return
-    const moves = scramble() // resets state to solved, returns move list
-    // Give React one tick to re-render the solved visual state
+    const moves = scramble()
     await new Promise((r) => setTimeout(r, 50))
     for (const move of moves) {
       const execFn = useCubeStore.getState().executeMove
@@ -39,15 +45,11 @@ export default function Toolbar() {
       const execFn = useCubeStore.getState().executeMove
       if (execFn) await execFn(move)
     }
-    // Trigger win celebration after solve completes
     if (useCubeStore.getState().isSolved) {
       triggerCelebration()
     }
   }, [getSolution, triggerCelebration])
 
-  /**
-   * Undo / Redo — instant state change (no animation).
-   */
   const handleUndo = useCallback(() => {
     if (useCubeStore.getState().isAnimating) return
     undo()
@@ -64,6 +66,24 @@ export default function Toolbar() {
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
+
+      {/* ── Mode Toggle — most important control, shown first ── */}
+      <button
+        className={
+          'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-200 active:scale-95 ' +
+          (isLookMode
+            ? 'bg-blue-500/80 hover:bg-blue-400/80 text-white ring-1 ring-blue-300/50'
+            : 'bg-emerald-500/80 hover:bg-emerald-400/80 text-white ring-1 ring-emerald-300/50')
+        }
+        onClick={toggleInteractionMode}
+        title={isLookMode ? 'Switch to Turn mode (drag face to rotate layer)' : 'Switch to Look mode (drag to orbit camera)'}
+      >
+        {isLookMode ? <Eye size={15} /> : <Hand size={15} />}
+        {isLookMode ? 'Looking' : 'Turning'}
+      </button>
+
+      <div className="w-px h-6 bg-white/20 mx-1" />
+
       <button
         className={btnClass}
         onClick={handleUndo}
