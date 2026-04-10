@@ -65,10 +65,16 @@ export function useCubeInteraction({ cubeGroupRef, cubieRefs, orbitRef, domEleme
         // GSAP-animate the rotation group
         await animateRotation(rotGroup, axisName, angle, speedOverride)
 
-        // Re-parent back to main cube group + snap to grid
+        // Re-parent back to main cube group + teleport back to React home slot.
+        // Important: this prevents the physical groups from permanently drifting 
+        // to new spots and causing their fixed `StickerFaces` to face inward.
         for (const c of [...rotGroup.children]) {
           cubeGroupRef.current.attach(c)
-          snapPosition(c.position)
+          if (c.userData && c.userData.gridPos) {
+            c.position.set(...c.userData.gridPos)
+          } else {
+            snapPosition(c.position)
+          }
           c.rotation.set(0, 0, 0)
         }
         cubeGroupRef.current.remove(rotGroup)

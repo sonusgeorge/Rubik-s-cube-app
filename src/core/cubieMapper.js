@@ -43,15 +43,16 @@ const FACELET_MAP = [
   { pos: [1,  1,  1], dir: 'y+' }, // U8
 
   // R face (9-17) — x=+1, viewed from right
-  { pos: [1,  1, -1], dir: 'x+' }, // R0
+  // Left is Front (+z), Right is Back (-z)
+  { pos: [1,  1,  1], dir: 'x+' }, // R0
   { pos: [1,  1,  0], dir: 'x+' }, // R1
-  { pos: [1,  1,  1], dir: 'x+' }, // R2
-  { pos: [1,  0, -1], dir: 'x+' }, // R3
+  { pos: [1,  1, -1], dir: 'x+' }, // R2
+  { pos: [1,  0,  1], dir: 'x+' }, // R3
   { pos: [1,  0,  0], dir: 'x+' }, // R4 (center)
-  { pos: [1,  0,  1], dir: 'x+' }, // R5
-  { pos: [1, -1, -1], dir: 'x+' }, // R6
+  { pos: [1,  0, -1], dir: 'x+' }, // R5
+  { pos: [1, -1,  1], dir: 'x+' }, // R6
   { pos: [1, -1,  0], dir: 'x+' }, // R7
-  { pos: [1, -1,  1], dir: 'x+' }, // R8
+  { pos: [1, -1, -1], dir: 'x+' }, // R8
 
   // F face (18-26) — z=+1, viewed from front
   { pos: [-1,  1, 1], dir: 'z+' }, // F0
@@ -76,15 +77,16 @@ const FACELET_MAP = [
   { pos: [1,  -1, -1], dir: 'y-' }, // D8
 
   // L face (36-44) — x=-1, viewed from left
-  { pos: [-1,  1,  1], dir: 'x-' }, // L0
+  // Left is Back (-z), Right is Front (+z)
+  { pos: [-1,  1, -1], dir: 'x-' }, // L0
   { pos: [-1,  1,  0], dir: 'x-' }, // L1
-  { pos: [-1,  1, -1], dir: 'x-' }, // L2
-  { pos: [-1,  0,  1], dir: 'x-' }, // L3
+  { pos: [-1,  1,  1], dir: 'x-' }, // L2
+  { pos: [-1,  0, -1], dir: 'x-' }, // L3
   { pos: [-1,  0,  0], dir: 'x-' }, // L4 (center)
-  { pos: [-1,  0, -1], dir: 'x-' }, // L5
-  { pos: [-1, -1,  1], dir: 'x-' }, // L6
+  { pos: [-1,  0,  1], dir: 'x-' }, // L5
+  { pos: [-1, -1, -1], dir: 'x-' }, // L6
   { pos: [-1, -1,  0], dir: 'x-' }, // L7
-  { pos: [-1, -1, -1], dir: 'x-' }, // L8
+  { pos: [-1, -1,  1], dir: 'x-' }, // L8
 
   // B face (45-53) — z=-1, viewed from back
   { pos: [1,   1, -1], dir: 'z-' }, // B0

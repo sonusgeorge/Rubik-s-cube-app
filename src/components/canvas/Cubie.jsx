@@ -43,7 +43,7 @@ export default function Cubie({ gridPos, faceColors = {}, cubieId, meshRef }) {
   }
 
   return (
-    <group position={gridPos}>
+    <group position={gridPos} userData={{ gridPos }}>
       <RoundedBox
         ref={handleRef}
         args={[1, 1, 1]}
