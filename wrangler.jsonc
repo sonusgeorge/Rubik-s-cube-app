@@ -1,0 +1,12 @@
+// Cloudflare Workers static-assets deployment (assets-only, no server code).
+// Deploy with: npm run deploy   (builds, then `wrangler deploy`)
+// Docs: https://developers.cloudflare.com/workers/static-assets/
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "rubiks-cube-app",
+  "compatibility_date": "2026-06-10",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
