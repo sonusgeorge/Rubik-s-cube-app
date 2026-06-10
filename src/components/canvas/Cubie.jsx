@@ -25,7 +25,7 @@ export default function Cubie({ gridPos, faceColors = {}, cubieId, meshRef }) {
   const bodyMaterial = useMemo(
     () =>
       new THREE.MeshPhysicalMaterial({
-        color: '#1a1a1a',
+        color: '#242424',
         roughness: 0.35,
         metalness: 0,
         clearcoat: 0.3,
@@ -36,10 +36,20 @@ export default function Cubie({ gridPos, faceColors = {}, cubieId, meshRef }) {
     [isDimmed]
   )
 
-  // Assign ref for drag-detection raycasting
+  // Assign ref for drag-detection raycasting.
+  // Deduplicate on mount and remove on unmount so the array doesn't
+  // accumulate stale/duplicate meshes across re-renders.
   const handleRef = (mesh) => {
-    if (ref) ref.current = mesh
-    if (meshRef && mesh) meshRef.push(mesh)
+    if (mesh) {
+      ref.current = mesh
+      if (meshRef && !meshRef.includes(mesh)) meshRef.push(mesh)
+    } else {
+      if (meshRef && ref.current) {
+        const i = meshRef.indexOf(ref.current)
+        if (i !== -1) meshRef.splice(i, 1)
+      }
+      ref.current = null
+    }
   }
 
   return (

@@ -31,20 +31,24 @@ function playClick(ctx, frequency = 440, duration = 0.05) {
   } catch {}
 }
 
+/**
+ * Plain functions (no hook needed) — read the sound setting fresh from the
+ * store so they can be called from imperative code like executeMove.
+ */
+export function playRotateSound() {
+  if (!useUIStore.getState().soundEnabled) return
+  const ctx = getAudioContext()
+  if (ctx) playClick(ctx, 600, 0.04)
+}
+
+export function playSnapSound() {
+  if (!useUIStore.getState().soundEnabled) return
+  const ctx = getAudioContext()
+  if (ctx) playClick(ctx, 800, 0.03)
+}
+
 export function useSound() {
-  const soundEnabled = useUIStore((s) => s.soundEnabled)
-
-  const playRotateSound = useCallback(() => {
-    if (!soundEnabled) return
-    const ctx = getAudioContext()
-    if (ctx) playClick(ctx, 600, 0.04)
-  }, [soundEnabled])
-
-  const playSnapSound = useCallback(() => {
-    if (!soundEnabled) return
-    const ctx = getAudioContext()
-    if (ctx) playClick(ctx, 800, 0.03)
-  }, [soundEnabled])
-
-  return { playRotateSound, playSnapSound }
+  const playRotate = useCallback(playRotateSound, [])
+  const playSnap = useCallback(playSnapSound, [])
+  return { playRotateSound: playRotate, playSnapSound: playSnap }
 }

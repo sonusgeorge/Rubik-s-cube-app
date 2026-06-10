@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { solvedState, applyMove, isSolved, parseMoveStr } from '../core/CubeState.js'
+import { solvedState, applyMove, isSolved, parseMoveStr, simplifyMoves } from '../core/CubeState.js'
 import { generateScramble } from '../core/scrambler.js'
 
 /**
@@ -15,12 +15,51 @@ function invertMove(moveName) {
   return `${face}'`
 }
 
+// ── Persistence ─────────────────────────────────────────────
+const STORAGE_KEY = 'rubiks-cube-state-v1'
+const VALID_COLORS = new Set(['U', 'R', 'F', 'D', 'L', 'B'])
+
+function loadPersisted() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const data = JSON.parse(raw)
+    if (!Array.isArray(data.facelets) || data.facelets.length !== 54) return null
+    if (!data.facelets.every((c) => VALID_COLORS.has(c))) return null
+    if (!Array.isArray(data.moveHistory)) return null
+    return {
+      facelets: data.facelets,
+      moveHistory: data.moveHistory,
+      redoStack: Array.isArray(data.redoStack) ? data.redoStack : [],
+    }
+  } catch {
+    return null
+  }
+}
+
+function persist(state) {
+  try {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        facelets: state.facelets,
+        moveHistory: state.moveHistory,
+        redoStack: state.redoStack,
+      })
+    )
+  } catch {
+    // storage full / unavailable — non-fatal
+  }
+}
+
+const persisted = typeof localStorage !== 'undefined' ? loadPersisted() : null
+
 const useCubeStore = create((set, get) => ({
-  facelets: solvedState(),
-  moveHistory: [],   // [{move: 'R', timestamp: number}]
-  redoStack: [],
+  facelets: persisted?.facelets ?? solvedState(),
+  moveHistory: persisted?.moveHistory ?? [],   // [{move: 'R', timestamp: number}]
+  redoStack: persisted?.redoStack ?? [],
   isAnimating: false,
-  isSolved: true,
+  isSolved: isSolved(persisted?.facelets ?? solvedState()),
   // Set by CubeControls to allow Toolbar to trigger animated moves
   executeMove: null,
   setExecuteMove(fn) { set({ executeMove: fn }) },
@@ -92,14 +131,16 @@ const useCubeStore = create((set, get) => ({
   },
 
   /**
-   * Compute the solution by inverting the current move history.
-   * This always produces a valid (if not minimal) solution.
+   * Compute the solution by inverting the current move history, then
+   * simplifying it (merging R R → R2, cancelling R R' etc.) so playback
+   * doesn't waste turns. Always produces a valid (if not minimal) solution.
    * Returns a move string array for animated playback.
    */
   getSolution() {
     const { moveHistory } = get()
     if (moveHistory.length === 0) return []
-    return [...moveHistory].reverse().map(({ move }) => invertMove(move))
+    const inverse = [...moveHistory].reverse().map(({ move }) => invertMove(move))
+    return simplifyMoves(inverse)
   },
 
   reset() {
@@ -123,5 +164,16 @@ const useCubeStore = create((set, get) => ({
     return solved
   },
 }))
+
+// Save cube state whenever it changes (cheap: only on facelet identity change)
+if (typeof localStorage !== 'undefined') {
+  let prevFacelets = useCubeStore.getState().facelets
+  useCubeStore.subscribe((state) => {
+    if (state.facelets !== prevFacelets) {
+      prevFacelets = state.facelets
+      persist(state)
+    }
+  })
+}
 
 export default useCubeStore
