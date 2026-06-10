@@ -1,6 +1,6 @@
 import React, { useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { PerspectiveCamera, OrbitControls, Environment } from '@react-three/drei'
+import { PerspectiveCamera, OrbitControls, Environment, Lightformer } from '@react-three/drei'
 import RubiksCube from './RubiksCube.jsx'
 import GroundPlane from './GroundPlane.jsx'
 import CubeControls from './CubeControls.jsx'
@@ -30,19 +30,31 @@ export default function CubeScene() {
         enablePan={false}
       />
 
-      {/* Lighting — 3-point studio setup */}
-      <ambientLight intensity={0.15} />
+      {/* Lighting — every face of the cube must stay readable from any angle,
+          including mid-rotation when stickers tilt away from the key light
+          and internal plastic gets exposed. */}
+      <ambientLight intensity={0.4} />
+      <hemisphereLight args={['#ffffff', '#8888aa', 0.5]} />
       <directionalLight
         position={[5, 8, 5]}
         intensity={1.2}
         castShadow
         shadow-mapSize={[1024, 1024]}
       />
-      <directionalLight position={[-3, 4, -2]} intensity={0.4} />
-      <directionalLight position={[0, 2, -8]} intensity={0.3} />
+      <directionalLight position={[-6, 4, 2]} intensity={0.6} />
+      <directionalLight position={[2, 3, -6]} intensity={0.6} />
+      <directionalLight position={[0, -5, 0]} intensity={0.35} />
 
-      {/* Environment map for reflections */}
-      <Environment preset="studio" />
+      {/* Environment map for reflections — rendered locally from Lightformers.
+          The previous preset="studio" fetched an HDR from a CDN at runtime:
+          on slow/failed loads the cube lost most of its lighting (faces went
+          near-black) and a fetch error crashed the whole canvas. */}
+      <Environment resolution={64}>
+        <Lightformer intensity={1.2} rotation-x={Math.PI / 2} position={[0, 5, 0]} scale={[10, 10, 1]} />
+        <Lightformer intensity={0.7} rotation-y={Math.PI / 2} position={[-5, 1, 0]} scale={[10, 3, 1]} />
+        <Lightformer intensity={0.7} rotation-y={-Math.PI / 2} position={[5, 1, 0]} scale={[10, 3, 1]} />
+        <Lightformer intensity={0.5} position={[0, 1, -5]} scale={[10, 3, 1]} />
+      </Environment>
 
       {/* The cube — cubeGroupRef is the rotation anchor */}
       <RubiksCube cubieRefs={cubieRefs} cubeGroupRef={cubeGroupRef} />

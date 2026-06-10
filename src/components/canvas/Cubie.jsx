@@ -25,7 +25,7 @@ export default function Cubie({ gridPos, faceColors = {}, cubieId, meshRef }) {
   const bodyMaterial = useMemo(
     () =>
       new THREE.MeshPhysicalMaterial({
-        color: '#1a1a1a',
+        color: '#242424',
         roughness: 0.35,
         metalness: 0,
         clearcoat: 0.3,

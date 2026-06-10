@@ -61,7 +61,7 @@ export default function StickerFace({
   const sideMaterial = useMemo(
     () =>
       new THREE.MeshPhysicalMaterial({
-        color: '#1a1a1a',
+        color: '#242424',
         roughness: 0.35,
         metalness: 0,
         transparent: opacity < 1,
