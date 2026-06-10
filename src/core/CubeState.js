@@ -71,3 +71,33 @@ export function isSolved(state) {
   }
   return true
 }
+
+// Moves on the same axis commute (R/L/M, U/D/E, F/B/S)
+const MOVE_AXIS = { R: 'x', L: 'x', M: 'x', U: 'y', D: 'y', E: 'y', F: 'z', B: 'z', S: 'z' }
+
+/**
+ * Simplify a move sequence by merging/cancelling turns of the same face,
+ * looking past moves on the same axis (which commute):
+ *   R R  → R2,  R R' → (nothing),  R2 R → R',  R L R' → L
+ */
+export function simplifyMoves(moves) {
+  // stack entries: [face, quarterTurns (1..3)]
+  const stack = []
+  for (const mv of moves) {
+    const [face, modifier] = parseMoveStr(mv)
+    const turns = modifier === -1 ? 3 : modifier
+
+    // Look back past commuting (same-axis, different-face) moves
+    let i = stack.length - 1
+    while (i >= 0 && stack[i][0] !== face && MOVE_AXIS[stack[i][0]] === MOVE_AXIS[face]) i--
+
+    if (i >= 0 && stack[i][0] === face) {
+      const total = (stack[i][1] + turns) % 4
+      if (total === 0) stack.splice(i, 1)
+      else stack[i][1] = total
+    } else {
+      stack.push([face, turns])
+    }
+  }
+  return stack.map(([face, t]) => (t === 1 ? face : t === 2 ? `${face}2` : `${face}'`))
+}

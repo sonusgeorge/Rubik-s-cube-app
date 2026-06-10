@@ -9,6 +9,7 @@ const MOVES = [
   { move: 'D / D\'', desc: 'Bottom face CW / CCW' },
   { move: 'F / F\'', desc: 'Front face CW / CCW' },
   { move: 'B / B\'', desc: 'Back face CW / CCW' },
+  { move: 'M / E / S', desc: 'Middle slices (follow L / D / F)' },
   { move: 'X2', desc: 'Double turn (180°)' },
 ]
 
@@ -37,6 +38,9 @@ export default function NotationGuide() {
       </div>
       <p className="text-xs text-white/30 mt-3">
         CW = clockwise when looking directly at that face
+      </p>
+      <p className="text-xs text-white/30 mt-1">
+        Keyboard: press a letter to turn, hold Shift for CCW
       </p>
     </div>
   )

@@ -4,12 +4,19 @@ import * as THREE from 'three'
 import { useDragDetection } from './useDragDetection.js'
 import { useRotation } from './useRotation.js'
 import { getRotationTarget, getCubiesInLayer, snapPosition } from '../core/rotationMath.js'
+import { playRotateSound, playSnapSound } from './useSound.js'
 import useCubeStore from '../store/cubeStore.js'
 import { useTutorialStore } from '../store/tutorialStore.js'
 import useUIStore from '../store/uiStore.js'
 
+const MAX_QUEUED_MOVES = 8 // drop input beyond this to avoid runaway spam
+
 /**
  * Orchestrates drag detection → rotation animation → state update.
+ *
+ * Moves are serialized through a FIFO promise chain: a move requested while
+ * another is animating is queued (up to MAX_QUEUED_MOVES) instead of dropped,
+ * so fast successive turns all register.
  *
  * `cubeGroupRef` — ref to the <group> wrapping all 27 cubies (from RubiksCube)
  * `cubieRefs`    — ref to array of cubie RoundedBox mesh objects (for raycasting)
@@ -26,17 +33,10 @@ export function useCubeInteraction({ cubeGroupRef, cubieRefs, orbitRef, domEleme
 
   const animateRotation = useRotation()
 
-  /**
-   * Execute a single move with full animation + state update.
-   * Reads isAnimating fresh from store to avoid stale-closure bugs.
-   * speedOverride: 'fast' | 'slow' | 'instant' | undefined (uses user setting)
-   */
-  const executeMove = useCallback(
+  /** The actual animation + state update for a single move. */
+  const performMove = useCallback(
     async (moveName, speedOverride) => {
-      // Always read fresh from store — avoids stale closure on isAnimating
-      if (useCubeStore.getState().isAnimating) return
       useCubeStore.getState().setAnimating(true)
-
       if (orbitRef?.current) orbitRef.current.enabled = false
 
       // Tutorial validation
@@ -49,7 +49,9 @@ export function useCubeInteraction({ cubeGroupRef, cubieRefs, orbitRef, domEleme
       const modifier = moveName.includes("'") ? -1 : moveName.includes('2') ? 2 : 1
       const { axisName, angle } = getRotationTarget(face, modifier)
 
-      // Find the 9 cubies in this face layer
+      playRotateSound()
+
+      // Find the 9 cubies in this move's layer
       // cubeGroupRef.current.children = the 27 Cubie <group> wrappers
       const cubeChildren = Array.from(cubeGroupRef.current?.children ?? [])
       const layerCubies = getCubiesInLayer(cubeChildren, face)
@@ -66,7 +68,7 @@ export function useCubeInteraction({ cubeGroupRef, cubieRefs, orbitRef, domEleme
         await animateRotation(rotGroup, axisName, angle, speedOverride)
 
         // Re-parent back to main cube group + teleport back to React home slot.
-        // Important: this prevents the physical groups from permanently drifting 
+        // Important: this prevents the physical groups from permanently drifting
         // to new spots and causing their fixed `StickerFaces` to face inward.
         for (const c of [...rotGroup.children]) {
           cubeGroupRef.current.attach(c)
@@ -82,12 +84,35 @@ export function useCubeInteraction({ cubeGroupRef, cubieRefs, orbitRef, domEleme
 
       // Update logical facelet state (triggers React re-render for colors)
       useCubeStore.getState().applyMove(moveName)
-      useCubeStore.getState().setAnimating(false)
+
+      playSnapSound()
 
       if (orbitRef?.current) orbitRef.current.enabled = true
     },
-    // NOTE: we intentionally exclude isAnimating from deps — we read it from store
     [animateRotation, cubeGroupRef, orbitRef, isTutorialActive, validateMove]
+  )
+
+  // FIFO queue: serialize moves so rapid input is played back in order
+  const queueRef = useRef(Promise.resolve())
+  const pendingRef = useRef(0)
+
+  const executeMove = useCallback(
+    (moveName, speedOverride) => {
+      if (pendingRef.current >= MAX_QUEUED_MOVES) return Promise.resolve()
+      pendingRef.current += 1
+      const run = queueRef.current.then(() =>
+        performMove(moveName, speedOverride).finally(() => {
+          pendingRef.current -= 1
+          // isAnimating stays true until the whole queue drains, so UI
+          // guards (undo/scramble buttons) cover queued moves too.
+          if (pendingRef.current === 0) useCubeStore.getState().setAnimating(false)
+        })
+      )
+      // Keep the chain alive even if a move throws
+      queueRef.current = run.catch(() => {})
+      return run
+    },
+    [performMove]
   )
 
   const { onPointerDown, onPointerUp } = useDragDetection({

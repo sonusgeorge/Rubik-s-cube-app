@@ -1,6 +1,5 @@
 import { useRef, useCallback } from 'react'
 import * as THREE from 'three'
-import useCubeStore from '../store/cubeStore.js'
 import useUIStore from '../store/uiStore.js'
 
 const DRAG_THRESHOLD = 8 // px before we commit to a rotation
@@ -41,8 +40,7 @@ export function useDragDetection({ cubieRefs, camera, domElement, orbitRef, onRo
     (event) => {
       // In 'look' mode, skip entirely — OrbitControls owns all drags
       if (useUIStore.getState().interactionMode === 'look') return
-      // Block new drags while animating
-      if (useCubeStore.getState().isAnimating) return
+      // Drags during an animation are allowed — the resulting move is queued.
       if (!domElement || !camera.current) return
 
       const ndc = getPointerNDC(event)
@@ -77,8 +75,6 @@ export function useDragDetection({ cubieRefs, camera, domElement, orbitRef, onRo
     (event) => {
       if (!dragState.current.down) return
       dragState.current.down = false
-
-      if (useCubeStore.getState().isAnimating) return
 
       const clientX = event.changedTouches
         ? event.changedTouches[0].clientX
@@ -145,25 +141,31 @@ function determineMoveFromDrag(faceNormal, dx, dy, cubie, cam) {
     axisIndex = 2; axisSign = rotAxis.z > 0 ? 1 : -1
   }
 
-  // Which grid layer along this axis?
-  const worldPos = new THREE.Vector3()
-  cubie.getWorldPosition(worldPos)
-  const layer = Math.round([worldPos.x, worldPos.y, worldPos.z][axisIndex])
+  // Which grid layer along this axis? Use the cubie's home slot (stable even
+  // mid-animation) rather than its live world position.
+  const home = cubie.userData?.gridPos
+  const pos = home ?? cubie.getWorldPosition(new THREE.Vector3()).toArray()
+  const layer = Math.round(pos[axisIndex])
 
   return layerToMove(axisIndex, layer, axisSign)
 }
 
-// axis index → { layer → face letter }
+// axis index → { layer → face letter }. Middle layers map to slice moves.
 const AXIS_FACE_MAP = [
-  { 1: 'R', '-1': 'L' },  // X axis
-  { 1: 'U', '-1': 'D' },  // Y axis
-  { 1: 'F', '-1': 'B' },  // Z axis
+  { 1: 'R', '-1': 'L', 0: 'M' },  // X axis
+  { 1: 'U', '-1': 'D', 0: 'E' },  // Y axis
+  { 1: 'F', '-1': 'B', 0: 'S' },  // Z axis
 ]
 
+// Each move's CW turn rotates by -90° * sign about its axis (rotationMath.js),
+// i.e. its right-hand-rule rotation axis points along -sign. The drag gesture
+// gives us the desired rotation axis directly (cross(normal, drag)), so the
+// move is CW exactly when the gesture sign is opposite the move's sign.
+const MOVE_SIGN = { R: 1, L: -1, M: -1, U: 1, D: -1, E: -1, F: 1, B: -1, S: 1 }
+
 function layerToMove(axisIndex, layer, sign) {
-  if (layer === 0) return null // middle slice — skip for now
-  const faceMap = AXIS_FACE_MAP[axisIndex]
-  const face = faceMap[layer]
+  const face = AXIS_FACE_MAP[axisIndex][layer]
   if (!face) return null
-  return sign > 0 ? face : `${face}'`
+  const cw = sign !== MOVE_SIGN[face]
+  return cw ? face : `${face}'`
 }
