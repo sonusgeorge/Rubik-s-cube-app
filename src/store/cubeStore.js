@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { solvedState, applyMove, isSolved, parseMoveStr, simplifyMoves } from '../core/CubeState.js'
 import { generateScramble } from '../core/scrambler.js'
+import { solve } from '../core/solver/index.js'
 
 /**
  * Invert a single move string.
@@ -145,13 +146,27 @@ const useCubeStore = create((set, get) => ({
   },
 
   /**
-   * Compute the solution by inverting the current move history, then
-   * simplifying it (merging R R → R2, cancelling R R' etc.) so playback
-   * doesn't waste turns. Always produces a valid (if not minimal) solution.
+   * Compute a solution for the current cube state.
+   *
+   * Uses the real beginner-method solver, so it works for any state (even
+   * one restored from storage or reached through slice moves). The result
+   * is verified before being returned; if the solver ever fails, we fall
+   * back to inverting the move history.
    * Returns a move string array for animated playback.
    */
   getSolution() {
-    const { moveHistory } = get()
+    const { facelets, moveHistory } = get()
+    if (isSolved(facelets)) return []
+
+    try {
+      const solution = simplifyMoves(solve(facelets))
+      let check = facelets
+      for (const move of solution) check = applyMove(check, move)
+      if (isSolved(check)) return solution
+    } catch {
+      // fall through to history inversion
+    }
+
     if (moveHistory.length === 0) return []
     const inverse = [...moveHistory].reverse().map(({ move }) => invertMove(move))
     return simplifyMoves(inverse)

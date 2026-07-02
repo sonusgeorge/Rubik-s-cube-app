@@ -37,16 +37,19 @@ export default function Toolbar() {
   }, [scramble])
 
   /**
-   * Solve: play back the inverse of move history sequentially.
+   * Solve: compute a solution with the beginner-method solver and play it
+   * back sequentially. Long solutions play at fast speed so the playback
+   * stays watchable (~160 moves is typical for layer-by-layer).
    */
   const handleSolve = useCallback(async () => {
     if (useCubeStore.getState().isAnimating) return
     if (useCubeStore.getState().isSolved) return
     const solution = getSolution()
     if (!solution || solution.length === 0) return
+    const speed = solution.length > 30 ? 'fast' : undefined
     for (const move of solution) {
       const execFn = useCubeStore.getState().executeMove
-      if (execFn) await execFn(move)
+      if (execFn) await execFn(move, speed)
     }
     if (useCubeStore.getState().isSolved) {
       triggerCelebration()

@@ -1,13 +1,16 @@
-import { solveBeginnerMethod } from './beginnerMethod.js'
+import { solveBeginnerMethod, getSolutionSteps, STAGES } from './beginnerMethod.js'
 
 /**
  * Main solver entry point.
- * Returns an array of move strings that solve the given state.
- * Falls back to the beginner method (layer-by-layer) which is suitable
- * for tutorial use and reasonable for animated playback.
+ * Returns an array of move strings that solve the given state using the
+ * beginner (layer-by-layer) method — suitable for animated playback and
+ * as the data source for the guided tutorial.
  *
- * A Kociemba two-phase solver can be plugged in here later.
+ * A Kociemba two-phase solver could be plugged in here later for shorter
+ * solutions.
  */
 export function solve(state) {
   return solveBeginnerMethod(state)
 }
+
+export { getSolutionSteps, STAGES }
