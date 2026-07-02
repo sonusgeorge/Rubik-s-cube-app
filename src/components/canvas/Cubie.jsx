@@ -4,7 +4,6 @@ import * as THREE from 'three'
 import StickerFace from './StickerFace.jsx'
 import { CORNER_RADIUS } from '../../utils/constants.js'
 import { useTutorialStore } from '../../store/tutorialStore.js'
-import FACELET_MAP from '../../core/cubieMapper.js'
 
 /**
  * One of the 27 cubies.
@@ -17,7 +16,10 @@ import FACELET_MAP from '../../core/cubieMapper.js'
  */
 export default function Cubie({ gridPos, faceColors = {}, cubieId, meshRef }) {
   const ref = useRef()
-  const { highlightedCubies, dimmedCubies } = useTutorialStore()
+  // Narrow selectors so cubies only re-render when highlight state changes,
+  // not on every tutorial-store update.
+  const highlightedCubies = useTutorialStore((s) => s.highlightedCubies)
+  const dimmedCubies = useTutorialStore((s) => s.dimmedCubies)
 
   const isHighlighted = highlightedCubies.includes(cubieId)
   const isDimmed = dimmedCubies && !isHighlighted

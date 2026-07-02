@@ -10,7 +10,7 @@ import { useTutorialStore } from '../../store/tutorialStore.js'
 export default function Toolbar() {
   const {
     undo, redo, scramble, getSolution, reset,
-    moveHistory, redoStack, isAnimating, isSolved,
+    moveHistory, redoStack, isAnimating, isSolved, scrambleBase,
   } = useCubeStore()
   const {
     toggleSettings, toggleNotationGuide, triggerCelebration,
@@ -31,6 +31,9 @@ export default function Toolbar() {
       const execFn = useCubeStore.getState().executeMove
       if (execFn) await execFn(move, 'fast')
     }
+    // Everything played so far was the scramble — the user's own move count
+    // starts from here.
+    useCubeStore.getState().markScrambleComplete()
   }, [scramble])
 
   /**
@@ -129,10 +132,10 @@ export default function Toolbar() {
         <RefreshCw size={16} /> Reset
       </button>
 
-      {/* Move counter */}
-      {moveHistory.length > 0 && (
+      {/* Move counter — counts the user's own turns, not the scramble */}
+      {Math.max(0, moveHistory.length - scrambleBase) > 0 && (
         <span className="text-white/50 text-xs font-mono px-2">
-          {moveHistory.length} moves
+          {Math.max(0, moveHistory.length - scrambleBase)} moves
         </span>
       )}
 

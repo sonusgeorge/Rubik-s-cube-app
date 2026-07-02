@@ -31,6 +31,7 @@ function loadPersisted() {
       facelets: data.facelets,
       moveHistory: data.moveHistory,
       redoStack: Array.isArray(data.redoStack) ? data.redoStack : [],
+      scrambleBase: Number.isInteger(data.scrambleBase) ? data.scrambleBase : 0,
     }
   } catch {
     return null
@@ -45,6 +46,7 @@ function persist(state) {
         facelets: state.facelets,
         moveHistory: state.moveHistory,
         redoStack: state.redoStack,
+        scrambleBase: state.scrambleBase,
       })
     )
   } catch {
@@ -58,6 +60,9 @@ const useCubeStore = create((set, get) => ({
   facelets: persisted?.facelets ?? solvedState(),
   moveHistory: persisted?.moveHistory ?? [],   // [{move: 'R', timestamp: number}]
   redoStack: persisted?.redoStack ?? [],
+  // Number of history entries that belong to the last scramble — moves past
+  // this index are the user's own turns (used for the move counter).
+  scrambleBase: persisted?.scrambleBase ?? 0,
   isAnimating: false,
   isSolved: isSolved(persisted?.facelets ?? solvedState()),
   // Set by CubeControls to allow Toolbar to trigger animated moves
@@ -126,8 +131,17 @@ const useCubeStore = create((set, get) => ({
       redoStack: [],
       isAnimating: false,
       isSolved: true,
+      scrambleBase: 0,
     })
     return moves
+  },
+
+  /**
+   * Called after all scramble moves have been played, so the move counter
+   * can distinguish scramble turns from the user's own turns.
+   */
+  markScrambleComplete() {
+    set({ scrambleBase: get().moveHistory.length })
   },
 
   /**
@@ -151,6 +165,7 @@ const useCubeStore = create((set, get) => ({
       redoStack: [],
       isAnimating: false,
       isSolved: true,
+      scrambleBase: 0,
     })
   },
 
@@ -165,12 +180,14 @@ const useCubeStore = create((set, get) => ({
   },
 }))
 
-// Save cube state whenever it changes (cheap: only on facelet identity change)
+// Save cube state whenever it changes (cheap: only on identity change)
 if (typeof localStorage !== 'undefined') {
   let prevFacelets = useCubeStore.getState().facelets
+  let prevBase = useCubeStore.getState().scrambleBase
   useCubeStore.subscribe((state) => {
-    if (state.facelets !== prevFacelets) {
+    if (state.facelets !== prevFacelets || state.scrambleBase !== prevBase) {
       prevFacelets = state.facelets
+      prevBase = state.scrambleBase
       persist(state)
     }
   })

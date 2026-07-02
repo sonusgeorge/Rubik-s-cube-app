@@ -11,9 +11,12 @@ export default function TutorialOverlay() {
   const exitTutorial = useTutorialStore((s) => s.exitTutorial)
 
   return (
-    <div className="absolute inset-0 pointer-events-auto flex z-40">
+    // pointer-events-none on the wrapper so the cube canvas underneath stays
+    // interactive (lessons ask the user to orbit and turn the cube); only the
+    // side panels capture the mouse.
+    <div className="absolute inset-0 pointer-events-none flex z-40">
       {/* Left sidebar — lesson list */}
-      <div className="flex flex-col bg-black/70 backdrop-blur w-64 flex-shrink-0 border-r border-white/10">
+      <div className="pointer-events-auto flex flex-col bg-black/70 backdrop-blur w-64 flex-shrink-0 border-r border-white/10">
         <div className="flex items-center justify-between p-3 border-b border-white/10">
           <span className="text-white text-sm font-bold">Learn to Solve</span>
           <button
@@ -30,7 +33,7 @@ export default function TutorialOverlay() {
       </div>
 
       {/* Right panel — step content */}
-      <div className="flex flex-col bg-black/50 backdrop-blur w-72 border-l border-white/10 ml-auto flex-shrink-0">
+      <div className="pointer-events-auto flex flex-col bg-black/50 backdrop-blur w-72 border-l border-white/10 ml-auto flex-shrink-0">
         <div className="flex-1 overflow-hidden">
           <StepCard />
         </div>

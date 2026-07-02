@@ -1,5 +1,20 @@
 import { create } from 'zustand'
 import { LESSONS } from '../core/tutorial/lessons.js'
+import FACELET_MAP from '../core/cubieMapper.js'
+
+/**
+ * Lessons specify highlights as facelet indices (0-53); the Cubie components
+ * match on cubie grid ids ("x,y,z"). Translate here so highlighting works.
+ */
+function faceletsToCubieIds(faceletIndices) {
+  if (!faceletIndices?.length) return []
+  const ids = new Set()
+  for (const i of faceletIndices) {
+    const entry = FACELET_MAP[i]
+    if (entry) ids.add(entry.pos.join(','))
+  }
+  return [...ids]
+}
 
 export const useTutorialStore = create((set, get) => ({
   isActive: false,
@@ -18,7 +33,10 @@ export const useTutorialStore = create((set, get) => ({
   dimmedCubies: false,
 
   startTutorial() {
-    set({ isActive: true, currentModule: 0, currentLesson: '0.1', currentStep: 0, lessonState: 'INTRO' })
+    set({ isActive: true, currentModule: 0 })
+    // Load the first lesson through startLesson so step data
+    // (expected moves, highlights) is initialized consistently.
+    get().startLesson('0.1')
   },
 
   exitTutorial() {
@@ -29,6 +47,7 @@ export const useTutorialStore = create((set, get) => ({
     const lesson = LESSONS[lessonId]
     if (!lesson) return
     const step = lesson.steps[0]
+    const highlighted = faceletsToCubieIds(step?.highlightFacelets)
     set({
       currentLesson: lessonId,
       currentStep: 0,
@@ -37,7 +56,8 @@ export const useTutorialStore = create((set, get) => ({
       moveIndex: 0,
       hintsUsed: 0,
       hintLevel: 0,
-      highlightedCubies: step?.highlightFacelets ?? [],
+      highlightedCubies: highlighted,
+      dimmedCubies: highlighted.length > 0,
     })
   },
 
@@ -51,16 +71,18 @@ export const useTutorialStore = create((set, get) => ({
       const { completedLessons } = get()
       const updated = { ...completedLessons, [currentLesson]: { completed: true, completedAt: new Date().toISOString() } }
       saveProgress(updated)
-      set({ lessonState: 'COMPLETE', completedLessons: updated })
+      set({ lessonState: 'COMPLETE', completedLessons: updated, highlightedCubies: [], dimmedCubies: false })
     } else {
       const step = lesson.steps[nextStep]
+      const highlighted = faceletsToCubieIds(step.highlightFacelets)
       set({
         currentStep: nextStep,
         lessonState: 'PRACTICE',
         expectedMoves: step.expectedMoves ?? [],
         moveIndex: 0,
         hintLevel: 0,
-        highlightedCubies: step.highlightFacelets ?? [],
+        highlightedCubies: highlighted,
+        dimmedCubies: highlighted.length > 0,
       })
     }
   },

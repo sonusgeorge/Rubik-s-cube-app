@@ -45,7 +45,7 @@ export const LESSONS = {
       {
         description: 'R means rotate the Right face clockwise. R\' (R prime) is counter-clockwise. R2 is a double turn (180°). Try pressing R now.',
         expectedMoves: ['R'],
-        hint: 'Click the R button in the toolbar, or drag the right face of the cube downward.',
+        hint: 'Press the R key on your keyboard, or drag the right face of the cube downward.',
         highlightFacelets: [9,10,11,12,13,14,15,16,17], // R face
       },
       {

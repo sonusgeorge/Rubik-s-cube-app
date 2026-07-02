@@ -10,6 +10,7 @@ import useCubeStore from '../../store/cubeStore.js'
 export default function SolvedOverlay() {
   const celebratingSolve = useUIStore((s) => s.celebratingSolve)
   const moveHistory = useCubeStore((s) => s.moveHistory)
+  const scrambleBase = useCubeStore((s) => s.scrambleBase)
   const isSolved = useCubeStore((s) => s.isSolved)
   const triggerCelebration = useUIStore((s) => s.triggerCelebration)
   const prevSolved = useRef(false)
@@ -50,7 +51,7 @@ export default function SolvedOverlay() {
           Solved!
         </h2>
         <p className="text-white/60 text-base">
-          in {moveHistory.length} moves
+          in {Math.max(0, moveHistory.length - scrambleBase)} moves
         </p>
         <div className="flex gap-2 mt-1">
           {['R', 'G', 'B', 'W', 'Y', 'O'].map((c, i) => (
