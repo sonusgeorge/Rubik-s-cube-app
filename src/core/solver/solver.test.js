@@ -23,6 +23,20 @@ describe('beginner method solver', () => {
     expect(solveBeginnerMethod(solvedState())).toEqual([])
   })
 
+  it('emits no moves for stages that are already complete', () => {
+    for (const step of getSolutionSteps(solvedState())) {
+      expect(step.moves, `stage ${step.id} should be a no-op on a solved cube`).toEqual([])
+    }
+    // A cube one D-turn from solved needs a single realignment move and
+    // nothing from any other stage.
+    const steps = getSolutionSteps(applyMove(solvedState(), 'D'))
+    const total = steps.flatMap((s) => s.moves)
+    expect(total.length).toBeLessThanOrEqual(3)
+    for (const step of steps) {
+      if (step.moves.length > 0) expect(step.moves.every((m) => m[0] === 'D')).toBe(true)
+    }
+  })
+
   it('solves single-move states', () => {
     for (const face of FACE_MOVES) {
       for (const mod of MODIFIERS) {

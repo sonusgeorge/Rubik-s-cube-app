@@ -368,7 +368,9 @@ function solveLLCornersOrient(ctx) {
   // (R U R' U') pairs, then turn D to bring the next corner in.
   // The upper layers look scrambled mid-stage but restore once every
   // corner is oriented and D is realigned.
-  for (let k = 0; k < 4; k++) {
+  const cornersOriented = () =>
+    [29, 35, 33, 27].every((i) => ctx.state[i] === ctx.state[CENTER.D])
+  for (let k = 0; k < 4 && !cornersOriented(); k++) {
     let guard = 0
     while (ctx.state[29] !== ctx.state[CENTER.D]) {
       ctx.run(['R', 'U', "R'", "U'"])

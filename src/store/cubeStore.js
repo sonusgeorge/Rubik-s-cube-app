@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { solvedState, applyMove, isSolved, parseMoveStr, simplifyMoves } from '../core/CubeState.js'
 import { generateScramble } from '../core/scrambler.js'
-import { solve } from '../core/solver/index.js'
+import { solve, applySequence } from '../core/solver/index.js'
 
 /**
  * Invert a single move string.
@@ -65,6 +65,10 @@ const useCubeStore = create((set, get) => ({
   // this index are the user's own turns (used for the move counter).
   scrambleBase: persisted?.scrambleBase ?? 0,
   isAnimating: false,
+  // True while a scripted sequence (scramble / solve) is playing back.
+  // User move input is ignored during playback so it can't interleave
+  // with the precomputed sequence and corrupt the outcome.
+  isPlayback: false,
   isSolved: isSolved(persisted?.facelets ?? solvedState()),
   // Set by CubeControls to allow Toolbar to trigger animated moves
   executeMove: null,
@@ -160,11 +164,11 @@ const useCubeStore = create((set, get) => ({
 
     try {
       const solution = simplifyMoves(solve(facelets))
-      let check = facelets
-      for (const move of solution) check = applyMove(check, move)
-      if (isSolved(check)) return solution
-    } catch {
-      // fall through to history inversion
+      if (isSolved(applySequence(facelets, solution))) return solution
+    } catch (err) {
+      // Should not happen for states produced by this app — surface it so a
+      // solver regression can't hide behind the fallback.
+      console.warn('Solver failed, falling back to history inversion:', err)
     }
 
     if (moveHistory.length === 0) return []
@@ -186,6 +190,10 @@ const useCubeStore = create((set, get) => ({
 
   setAnimating(v) {
     set({ isAnimating: v })
+  },
+
+  setPlayback(v) {
+    set({ isPlayback: v })
   },
 
   checkSolved() {

@@ -14,7 +14,7 @@ export default function Toolbar() {
   } = useCubeStore()
   const {
     toggleSettings, toggleNotationGuide, triggerCelebration,
-    interactionMode, toggleInteractionMode,
+    interactionMode, toggleInteractionMode, animationSpeed,
   } = useUIStore()
   const startTutorial = useTutorialStore((s) => s.startTutorial)
 
@@ -27,9 +27,14 @@ export default function Toolbar() {
     if (useCubeStore.getState().isAnimating) return
     const moves = scramble()
     await new Promise((r) => setTimeout(r, 50))
-    for (const move of moves) {
-      const execFn = useCubeStore.getState().executeMove
-      if (execFn) await execFn(move, 'fast')
+    useCubeStore.getState().setPlayback(true)
+    try {
+      for (const move of moves) {
+        const execFn = useCubeStore.getState().executeMove
+        if (execFn) await execFn(move, 'fast')
+      }
+    } finally {
+      useCubeStore.getState().setPlayback(false)
     }
     // Everything played so far was the scramble — the user's own move count
     // starts from here.
@@ -46,15 +51,22 @@ export default function Toolbar() {
     if (useCubeStore.getState().isSolved) return
     const solution = getSolution()
     if (!solution || solution.length === 0) return
-    const speed = solution.length > 30 ? 'fast' : undefined
-    for (const move of solution) {
-      const execFn = useCubeStore.getState().executeMove
-      if (execFn) await execFn(move, speed)
+    // Upgrade the default speed for long solutions, but respect an explicit
+    // user preference ('slow' for watching, 'fast' already fast).
+    const speed = solution.length > 30 && animationSpeed === 'normal' ? 'fast' : undefined
+    useCubeStore.getState().setPlayback(true)
+    try {
+      for (const move of solution) {
+        const execFn = useCubeStore.getState().executeMove
+        if (execFn) await execFn(move, speed)
+      }
+    } finally {
+      useCubeStore.getState().setPlayback(false)
     }
     if (useCubeStore.getState().isSolved) {
       triggerCelebration()
     }
-  }, [getSolution, triggerCelebration])
+  }, [getSolution, triggerCelebration, animationSpeed])
 
   const handleUndo = useCallback(() => {
     if (useCubeStore.getState().isAnimating) return

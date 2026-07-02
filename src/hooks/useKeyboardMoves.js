@@ -18,6 +18,10 @@ export function useKeyboardMoves() {
       const letter = e.key.toUpperCase()
       if (!MOVE_KEYS.has(letter)) return
 
+      // Ignore input while a scramble/solve sequence is playing back —
+      // an injected move would corrupt the precomputed sequence.
+      if (useCubeStore.getState().isPlayback) return
+
       const executeMove = useCubeStore.getState().executeMove
       if (!executeMove) return
       e.preventDefault()

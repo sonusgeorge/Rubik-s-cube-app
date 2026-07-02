@@ -1,6 +1,7 @@
 import { useRef, useCallback } from 'react'
 import * as THREE from 'three'
 import useUIStore from '../store/uiStore.js'
+import useCubeStore from '../store/cubeStore.js'
 
 const DRAG_THRESHOLD = 8 // px before we commit to a rotation
 
@@ -40,6 +41,9 @@ export function useDragDetection({ cubieRefs, camera, domElement, orbitRef, onRo
     (event) => {
       // In 'look' mode, skip entirely — OrbitControls owns all drags
       if (useUIStore.getState().interactionMode === 'look') return
+      // Ignore turn gestures while a scramble/solve sequence is playing back —
+      // an injected move would corrupt the precomputed sequence.
+      if (useCubeStore.getState().isPlayback) return
       // Drags during an animation are allowed — the resulting move is queued.
       if (!domElement || !camera.current) return
 

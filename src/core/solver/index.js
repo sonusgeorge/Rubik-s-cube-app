@@ -1,4 +1,4 @@
-import { solveBeginnerMethod, getSolutionSteps, STAGES } from './beginnerMethod.js'
+import { solveBeginnerMethod, getSolutionSteps, STAGES, applySequence } from './beginnerMethod.js'
 
 /**
  * Main solver entry point.
@@ -13,4 +13,4 @@ export function solve(state) {
   return solveBeginnerMethod(state)
 }
 
-export { getSolutionSteps, STAGES }
+export { getSolutionSteps, STAGES, applySequence }
